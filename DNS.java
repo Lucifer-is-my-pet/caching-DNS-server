@@ -24,6 +24,7 @@ public class DNS {
 				DatagramPacket fromNslookup = new DatagramPacket(bytesfromNslookup, bytesfromNslookup.length); 
 
 				server.receive(fromNslookup);
+//				System.out.println("----Recieved something " + fromNslookup);
 				Thread th = new Thread(new Handler(fromNslookup, cache, forwarderAddress, newPort, server));
 				th.start();
 				newPort += 1;

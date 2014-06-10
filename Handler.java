@@ -13,7 +13,7 @@ public class Handler implements Runnable {
 
 	private DatagramSocket serverSocket;
 	private DatagramPacket fromNslookup;
-	private DNScache cache;
+	private volatile DNScache cache;
 	private String forwarderAddress;
 	private DatagramSocket back;
 
@@ -31,11 +31,10 @@ public class Handler implements Runnable {
 
 	@Override
 	public void run() {
-		System.out.println("======");
 		InetAddress IPAddress = fromNslookup.getAddress();
 		int port = fromNslookup.getPort();
 		byte[] data1 = Arrays.copyOfRange(fromNslookup.getData(), 0, fromNslookup.getLength());
-//		System.out.println("Received packet of " + data1.length + " bytes from nslookup");
+		//		System.out.println("Received packet of " + data1.length + " bytes from nslookup");
 
 		Header header = null;
 		Message message = null;
@@ -45,17 +44,20 @@ public class Handler implements Runnable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		int ID = header.getID();		
-		Record record = message.getQuestion();
-		String name = record.getName().toString();
-		//int type = record.getType();
-		int type = 1;
+		int ID = header.getID();
+
+		Record recordQ = message.getQuestion();
+
+		String name = recordQ.getName().toString();
+		//		int[] type = new int[3]; 
+		int type = recordQ.getType();
+		//		System.out.println(this + " record = " + record + ", type = " + record.getType());
 
 		synchronized (cache) {
 			cache.update();
 			ArrayList<Record> recs = cache.findRecords(name, type);
 			if (recs.isEmpty()) {
-				System.out.println("I don't know about " + name);
+				//				System.out.println("I don't know about " + name);
 				DatagramPacket toForwarder = null;
 				try {
 					toForwarder = new DatagramPacket(data1, data1.length, InetAddress.getByName(forwarderAddress), 53);
@@ -75,47 +77,49 @@ public class Handler implements Runnable {
 					e.printStackTrace();
 				}
 				byte[] data2 = Arrays.copyOfRange(fromForwarder.getData(), 0, fromForwarder.getLength());
-//				System.out.println("Received answer of " + data2.length + " bytes from 8.8.8.8");
-
+				//				System.out.println("Received answer of " + data2.length + " bytes from forwarder");
+				System.out.println("Don't know. In cache:");
+				cache.printRecords();
 				Message mess = null;
 				try {
 					mess = new Message(data2);
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
-				Record[] records = mess.getSectionArray(1);
+				Record[] records = mess.getSectionArray(Section.ANSWER);
 				for (int i = 0; i < records.length; i++) {
 					cache.addRecord(records[i]);
 				}
+
 				DatagramPacket toNslookup = new DatagramPacket(data2, data2.length, IPAddress, port);
 
 				try {
 					this.back.send(toNslookup);		
-//					System.out.println("send back to " + IPAddress);
+					//					System.out.println("send back to " + IPAddress);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 
 			} else {
-				System.out.println("Found some records about " + name);
+				//				System.out.println("Found some records about " + name);
 				Message mess = new Message(ID);
-				for (int i = 0; i < recs.size(); i++) {				
-					mess.addRecord(recs.get(i), 1);
+				for (int i = 0; i < recs.size(); i++) {
+					mess.addRecord(recs.get(i), Section.ANSWER);
 				}
 				DatagramPacket toNslookup = new DatagramPacket(mess.toWire(), mess.toWire().length, IPAddress, port);					
 				try {
 					this.back.send(toNslookup);	
-//					System.out.println("send back to " + IPAddress);
+					//					System.out.println("send back to " + IPAddress);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-
+				System.out.println("Know. In cache:");
+				cache.printRecords();
 			}
+
 		}
 		serverSocket.close();
-		System.out.println("What in cache:");
-		cache.printRecords();
-		System.out.println("######");
+
 	}
 
 }

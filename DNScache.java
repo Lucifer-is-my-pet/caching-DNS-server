@@ -1,10 +1,9 @@
 import java.util.ArrayList;
-
 import org.xbill.DNS.*;
 
 public class DNScache {
 	
-	public ArrayList<Record> cache;
+	public volatile ArrayList<Record> cache;
 	private ArrayList<Long> sysTime;
 
 	public DNScache() {
@@ -12,11 +11,11 @@ public class DNScache {
 		this.cache = cache;
 		sysTime = new ArrayList<Long>();
 	}
-	
+
 	public void addRecord(Record rec) {
 		sysTime.add(System.currentTimeMillis());
 		cache.add(rec);
-		System.out.println(rec);
+//		System.out.println(rec);
 	}
 	
 	public void deleteRecords(String name, int type) {
@@ -45,7 +44,7 @@ public class DNScache {
 	public ArrayList<Record> findRecords(String name) {
 		ArrayList<Record> result = new ArrayList<>();
 		for (int i = 0; i < cache.size(); i++) {
-			if (cache.get(i).getName().equals(name))
+			if (cache.get(i).getName().toString().equals(name))
 				result.add(cache.get(i));
 		}
 		return result;
@@ -56,10 +55,12 @@ public class DNScache {
 	}
 	
 	public void update() {
+
 		for (int i = 0; i < cache.size(); i++) {
 			if (System.currentTimeMillis() >= (sysTime.get(i) + cache.get(i).getTTL()*1000)) {
-				System.out.println("Removing " + cache.get(i));
-				cache.remove(cache.get(i));
+				System.out.println("Removing " + cache.get(i).getName().toString() + " with ttl = " + cache.get(i).getTTL());
+				deleteRecords(cache.get(i).getName().toString(), cache.get(i).getType());
+				break;
 			}
 		}
 	}
